@@ -61,9 +61,35 @@
       function sendMessage() {
         let newMessage = document.getElementById('message');
         if (newMessage != null) {
-          conn.send(newMessage.value);
+          sendEvent('send_message', newMessage.value);
         }
         return false;
+      }
+
+      class Event {
+        constructor(type, payload) {
+          this.type = type;
+          this.payload = payload;
+        }
+      }
+
+      function routeEvent(event) {
+        if (event.type === undefined) {
+          alert('no type field in the event');
+        }
+        switch (event.type) {
+          case 'new_message':
+            console.log('new message');
+            break;
+          default:
+            alert('unsupported message type');
+            break;
+        }
+      }
+
+      function sendEvent(eventName, payload) {
+        const event = new Event(eventName, payload);
+        conn.send(JSON.stringify(payload));
       }
 
       window.onload = function () {
@@ -72,6 +98,11 @@
         if (window['WebSocket']) {
           console.log('supports Websockets');
           conn = new WebSocket('ws://' + document.location.host + '/ws');
+          conn.onmessage = function (evt) {
+            const eventData = JSON.parse(evt.data);
+            const event = Object.assign(new Event(), eventData);
+            routeEvent(event);
+          };
         } else {
           alert('doesnot support Websockets');
         }

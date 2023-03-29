@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -18,10 +20,34 @@ var (
 type Manager struct {
 	clients ClientList
 	sync.RWMutex
+	handlers map[string]EventHandler
 }
 
 func NewManager() *Manager {
-	return &Manager{clients: make(ClientList)}
+	m := &Manager{clients: make(ClientList), handlers: make(map[string]EventHandler)}
+	m.setupEventHandlers()
+	return m
+}
+
+func (m *Manager) setupEventHandlers() {
+	m.handlers[EventSendMessage] = SendMessage
+}
+
+func SendMessage(event Event, c *Client) error {
+	fmt.Println(event)
+	return nil
+}
+
+func (m *Manager) routeEvent(event Event, c *Client) error {
+	if handler, ok := m.handlers[event.Type]; ok {
+		if err := handler(event, c); err != nil {
+			return err
+		}
+		return nil
+	} else {
+		return errors.New("no such event type")
+	}
+
 }
 
 func (m *Manager) serveWS(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +60,7 @@ func (m *Manager) serveWS(w http.ResponseWriter, r *http.Request) {
 	client := NewClient(conn, m)
 	m.addClient(client)
 	go client.readMessages()
+	go client.writeMessages()
 }
 
 func (m *Manager) addClient(client *Client) {

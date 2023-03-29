@@ -25,7 +25,7 @@
     <div class="center">
       <h1>Chat App</h1>
       <h3 id="connection-header"></h3>
-      <h3 class="chat-header">Currently in chat: general</h3>
+      <h3 id="chat-header">Currently in chat: general</h3>
       <form id="chatroom-selection">
         <label for="chatroom">Chatroom: </label>
         <input type="text" id="chatroom" name="chatroom" />
@@ -61,18 +61,27 @@
 
     <script type="text/javascript">
       let selectedChat = 'general';
-      function changeChatRoom() {
-        let newChat = document.getElementById('chatroom');
-        if (newChat != null && newChat.value != selectedChat) {
-          console.log(newChat);
+
+      class SendMessageEvent {
+        constructor(message, from) {
+          this.message = message;
+          this.from = from;
         }
-        return false;
+      }
+
+      class NewMessageEvent {
+        constructor(message, from, sent) {
+          this.message = message;
+          this.from = from;
+          this.sent = sent;
+        }
       }
 
       function sendMessage() {
         let newMessage = document.getElementById('message');
         if (newMessage != null) {
-          sendEvent('send_message', newMessage.value);
+          let outgoingEvent = new SendMessageEvent(newMessage.value, 'manny');
+          sendEvent('send_message', outgoingEvent);
         }
         return false;
       }
@@ -140,17 +149,50 @@
         }
         switch (event.type) {
           case 'new_message':
-            console.log('new message');
+            const messageEvent = Object.assign(
+              new NewMessageEvent(),
+              event.payload
+            );
+            appendChatMessage(messageEvent);
             break;
           default:
             alert('unsupported message type');
             break;
         }
       }
+      function appendChatMessage(messageEvent) {
+        var date = new Date(messageEvent.sent);
+        const formattedMsg = `${date.toLocaleString()}: ${
+          messageEvent.message
+        }`;
+        textarea = document.getElementById('chatmessages');
+        textarea.innerHTML = textarea.innerHTML + '\n' + formattedMsg;
+        textarea.scrollTop = textarea.scrollHeight;
+      }
 
+      class ChangeChatRoomEvent {
+        constructor(name) {
+          this.name = name;
+        }
+      }
+
+      function changeChatRoom() {
+        var newchat = document.getElementById('chatroom');
+        if (newchat != null && newchat.value != selectedChat) {
+          selectedChat = newchat.value;
+          header = document.getElementById('chat-header').innerHTML =
+            'Currently in chat: ' + selectedChat;
+
+          let changeEvent = new ChangeChatRoomEvent(selectedChat);
+          sendEvent('change_room', changeEvent);
+          textarea = document.getElementById('chatmessages');
+          textarea.innerHTML = `You changed room into: ${selectedChat}`;
+        }
+        return false;
+      }
       function sendEvent(eventName, payload) {
         const event = new Event(eventName, payload);
-        conn.send(JSON.stringify(payload));
+        conn.send(JSON.stringify(event));
       }
 
       window.onload = function () {

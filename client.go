@@ -18,6 +18,7 @@ var (
 type Client struct {
 	connection *websocket.Conn
 	manager    *Manager
+	chatroom   string
 	egress     chan Event
 }
 
@@ -52,14 +53,12 @@ func (c *Client) readMessages() {
 			}
 			break
 		}
-
 		var request Event
 
 		if err := json.Unmarshal(payload, &request); err != nil {
-			log.Printf("errror marshalling event :%v", err)
+			log.Printf("error marshalling event :%v", err)
 			break
 		}
-
 		if err := c.manager.routeEvent(request, c); err != nil {
 			log.Println("error handling message: ", err)
 		}

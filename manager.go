@@ -68,14 +68,48 @@ func (m *Manager) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 func (m *Manager) setupEventHandlers() {
 	m.handlers[EventSendMessage] = SendMessage
+	m.handlers[EventChatRoom] = chatroomHandler
+
+}
+
+func chatroomHandler(event Event, c *Client) error {
+	var changeRoomEvent ChangeRoomEvent
+	if err := json.Unmarshal(event.Payload, &changeRoomEvent); err != nil {
+		return fmt.Errorf("bad payload in request: %v", err)
+	}
+
+	c.chatroom = changeRoomEvent.Name
+	return nil
 }
 
 func SendMessage(event Event, c *Client) error {
-	fmt.Println(event)
+	var chatEvent SendMessageEvent
+	if err := json.Unmarshal(event.Payload, &chatEvent); err != nil {
+		return fmt.Errorf("bad payload in request: %v", err)
+	}
+	var broadMessage NewMessageEvent
+	broadMessage.Sent = time.Now()
+	broadMessage.Message = chatEvent.Message
+	broadMessage.From = chatEvent.From
+
+	data, err := json.Marshal(broadMessage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal broadcast message: %v", err)
+	}
+	outgoingEvent := Event{
+		Payload: data,
+		Type:    EventNewMessage,
+	}
+	for client := range c.manager.clients {
+		if client.chatroom == c.chatroom {
+			client.egress <- outgoingEvent
+		}
+	}
 	return nil
 }
 
 func (m *Manager) routeEvent(event Event, c *Client) error {
+	log.Println(event.Type)
 	if handler, ok := m.handlers[event.Type]; ok {
 		if err := handler(event, c); err != nil {
 			return err

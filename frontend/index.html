@@ -24,6 +24,7 @@
   <body>
     <div class="center">
       <h1>Chat App</h1>
+      <h3 id="connection-header"></h3>
       <h3 class="chat-header">Currently in chat: general</h3>
       <form id="chatroom-selection">
         <label for="chatroom">Chatroom: </label>
@@ -46,6 +47,16 @@
         <input type="text" id="message" name="message" />
         <input type="submit" value="Send message" />
       </form>
+
+      <div style="border: 3px solid black; margin-top: 30px">
+        <form id="login-form">
+          <label for="username">username:</label>
+          <input type="text" name="username" id="username" /><br />
+          <label for="password">password:</label>
+          <input type="password" name="password" id="password" /><br /><br />
+          <input type="submit" value="Login" />
+        </form>
+      </div>
     </div>
 
     <script type="text/javascript">
@@ -64,6 +75,56 @@
           sendEvent('send_message', newMessage.value);
         }
         return false;
+      }
+      function login() {
+        let formData = {
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value,
+        };
+        fetch('login', {
+          method: 'post',
+          body: JSON.stringify(formData),
+          mode: 'cors',
+        })
+          .then((response) => {
+            if (response.ok) {
+              return response.json();
+            } else {
+              throw 'unauthorized';
+            }
+          })
+          .then((data) => {
+            connectWebSocket(data.otp);
+          })
+          .catch((e) => {
+            alert(e);
+          });
+        return false;
+      }
+
+      function connectWebSocket(otp) {
+        if (window['WebSocket']) {
+          console.log('supports Websockets');
+          conn = new WebSocket(
+            'ws://' + document.location.host + '/ws?otp=' + otp
+          );
+
+          conn.onopen = function (evt) {
+            document.getElementById('connection-header').innerHTML =
+              'Connected to Webscoket: true';
+          };
+          conn.onclose = function (evt) {
+            document.getElementById('connection-header').innerHTML =
+              'Connected to Webscoket: false';
+          };
+          conn.onmessage = function (evt) {
+            const eventData = JSON.parse(evt.data);
+            const event = Object.assign(new Event(), eventData);
+            routeEvent(event);
+          };
+        } else {
+          alert('doesnot support Websockets');
+        }
       }
 
       class Event {
@@ -95,17 +156,7 @@
       window.onload = function () {
         document.getElementById('chatroom-selection').onsubmit = changeChatRoom;
         document.getElementById('chatroom-message').onsubmit = sendMessage;
-        if (window['WebSocket']) {
-          console.log('supports Websockets');
-          conn = new WebSocket('ws://' + document.location.host + '/ws');
-          conn.onmessage = function (evt) {
-            const eventData = JSON.parse(evt.data);
-            const event = Object.assign(new Event(), eventData);
-            routeEvent(event);
-          };
-        } else {
-          alert('doesnot support Websockets');
-        }
+        document.getElementById('login-form').onsubmit = login;
       };
     </script>
   </body>
